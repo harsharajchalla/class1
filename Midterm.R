@@ -1,43 +1,106 @@
-# Load necessary libraries
-library(readr) # For reading data
-library(dplyr) # For data manipulation
-library(ggplot2) # For visualization
-library(caret) # For data splitting
-library(MLmetrics) # For evaluation metrics
-library(glmnet) # For regularization
-library(e1071) # For logistic regression
+library(ggplot2)
 
-# Load the dataset
-data <- read.csv("C:/Users/HP/Downloads/Housing.csv")
+# Read the csv file
+file_path <- "C:/Users/HP/Downloads/Titanic-Dataset.csv"
+data <- read.csv(file_path)
+str(data)
 
-# Data exploration and preprocessing
-# Assuming the dataset has been preprocessed and cleaned
+# Linear Regression: Using 'Age' to predict 'Fare'
+model_linear <- lm(Fare ~ Age, data=data)
 
-# Splitting the dataset into train and test sets
-set.seed(123) # For reproducibility
-train_index <- createDataPartition(data$Sale_Price, p = 0.8, list = FALSE)
-train_data <- data[train_index, ]
-test_data <- data[-train_index, ]
+# Predictions
+data$pred_linear <- predict(model_linear, newdata=data)
 
-# Linear Regression
-lm_model <- lm(Sale_Price ~ ., data = train_data)
-lm_predictions <- predict(lm_model, newdata = test_data)
-lm_rmse <- RMSE(lm_predictions, test_data$Sale_Price)
+# Plotting Linear Regression
+plot(data$Age, data$Fare, main="Linear Regression: Age vs Fare",
+     xlab="Age", ylab="Fare", col="black", pch=13)
+lines(data$Age, data$pred_linear, col="yellow", lwd=2)
+legend("topright", legend=c("Actual data", "Fitted line"), col=c("black", "yellow"), pch=c(16, NA), lty=c(NA, 1))
 
-# Polynomial Regression (Degree 2)
-poly_model <- lm(Sale_Price ~ poly(. , 2, raw = TRUE), data = train_data)
-poly_predictions <- predict(poly_model, newdata = test_data)
-poly_rmse <- RMSE(poly_predictions, test_data$Sale_Price)
 
-# Logistic Regression
-# Assuming Sale_Price is categorical (e.g., 0 for low price, 1 for high price)
-logistic_model <- glm(Sale_Price ~ ., data = train_data, family = binomial)
-logistic_predictions <- predict(logistic_model, newdata = test_data, type = "response")
-# Assuming threshold for classification is 0.5
-logistic_predictions <- ifelse(logistic_predictions > 0.5, 1, 0)
-logistic_accuracy <- Accuracy(logistic_predictions, test_data$Sale_Price)
 
-# Print evaluation metrics
-cat("Linear Regression RMSE:", lm_rmse, "\n")
-cat("Polynomial Regression RMSE:", poly_rmse, "\n")
-cat("Logistic Regression Accuracy:", logistic_accuracy, "\n")
+# Linear Regression: Using 'Survived' to predict 'Fare'
+model_linear <- lm(Fare ~ Survived, data=data)
+
+# Predictions
+data$pred_linear <- predict(model_linear, newdata=data)
+
+# Plotting Linear Regression
+plot(data$Survived, data$Fare, main="Linear Regression: Survived vs Fare",
+     xlab="Survived", ylab="Fare", col="black", pch=13)
+lines(data$Survived, data$pred_linear, col="yellow", lwd=2)
+legend("topright", legend=c("Actual data", "Fitted line"), col=c("black", "yellow"), pch=c(16, NA), lty=c(NA, 1))
+
+
+
+# Polynomial Regression: Using 'Fare' to predict 'Age' with a degree 3 polynomial
+model_poly <- lm(Age ~ poly(Fare, 3), data=data)
+
+# Predictions for Polynomial Regression
+data <- data[order(data$Fare), ]  # Order the data by Fare
+data$pred_poly <- predict(model_poly, newdata=data)
+
+# Plotting Polynomial Regression
+plot(data$Fare, data$Age, main="Polynomial Regression: Fare vs Age",
+     xlab="Fare", ylab="Age", col="red", pch=16)
+lines(data$Fare, data$pred_poly, col="green", lwd=3)
+legend("topright", legend=c("Actual data", "Fitted polynomial"), col=c("red", "green"), pch=c(16, NA), lty=c(NA, 1))
+
+
+# Polynomial Regression: Using 'Fare' to predict 'Survived' with a degree 3 polynomial
+model_poly <- lm(Survived ~ poly(Fare, 3), data=data)
+
+# Predictions for Polynomial Regression
+data <- data[order(data$Fare), ]  # Order the data by Fare
+data$pred_poly <- predict(model_poly, newdata=data)
+
+# Plotting Polynomial Regression
+plot(data$Fare, data$Survived, main="Polynomial Regression: Fare vs Survived",
+     xlab="Fare", ylab="Survived", col="red", pch=16)
+lines(data$Fare, data$pred_poly, col="green", lwd=3)
+legend("topright", legend=c("Actual data", "Fitted polynomial"), col=c("red", "green"), pch=c(16, NA), lty=c(NA, 1))
+
+
+
+
+# Create a binary variable 'Age_high' (1 if Age > median, else 0)
+data$Age_high <- ifelse(data$Age > median(data$Age), 1, 0)
+
+# Check the structure and preview the data
+str(data)
+head(data)
+# Data preprocessing
+# Create a binary variable 'Survived' (1 if survived, else 0)
+data <- data %>%
+  select(Survived, Pclass, Sex, Age, Fare) %>%
+  mutate(Sex = ifelse(Sex == "male", 1, 0)) %>%
+  filter(!is.na(Age), !is.na(Fare))
+
+# Logistic Regression: Using 'Fare', 'Pclass', and 'Sex' to predict 'Survived'
+model_logistic <- glm(Survived ~ Fare + Pclass + Sex + Age, data = data, family = binomial)
+
+# Summary of the model
+summary(model_logistic)
+
+# Predictions for Logistic Regression
+data$pred_logistic <- predict(model_logistic, type = "response")
+data$pred_class <- ifelse(data$pred_logistic > 0.5, 1, 0)
+
+# Confusion matrix to evaluate the model
+confusion_matrix <- table(Predicted = data$pred_class, Actual = data$Survived)
+print(confusion_matrix)
+
+# Accuracy
+accuracy <- mean(data$pred_class == data$Survived)
+print(paste("Accuracy:", accuracy))
+
+# Plotting Logistic Regression using ggplot2
+ggplot(data, aes(x = Fare, y = Survived)) +
+  geom_jitter(width = 0.1, height = 0.1, color = "black", alpha = 0.5) +
+  geom_jitter(aes(y = pred_class), width = 0.1, height = 0.1, color = "red", alpha = 0.5) +
+  labs(title = "Logistic Regression: Fare vs Survived",
+       x = "Fare",
+       y = "Survived") +
+  theme_minimal() +
+  scale_y_continuous(breaks = c(0, 1), labels = c("Not Survived", "Survived"))
+
